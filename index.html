@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Video Chat</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+</head>
+<body>
+
+<!-- ========== ログイン・登録画面 ========== -->
+<div id="authScreen" class="screen">
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <i class="fas fa-video"></i>
+                <h1>Secure Video Chat</h1>
+                <p>安全なP2P暗号化ビデオ通話</p>
+            </div>
+
+            <!-- タブ切り替え -->
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">ログイン</button>
+                <button class="auth-tab" data-tab="register">新規登録</button>
+            </div>
+
+            <!-- ログインフォーム -->
+            <div id="loginForm" class="auth-form">
+                <div class="form-group">
+                    <label><i class="fas fa-user"></i> 名前</label>
+                    <input type="text" id="loginName" placeholder="登録した名前を入力" maxlength="20" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-lock"></i> パスワード</label>
+                    <div class="password-wrap">
+                        <input type="password" id="loginPassword" placeholder="パスワードを入力" autocomplete="current-password">
+                        <button class="pw-toggle-btn" data-target="loginPassword" tabindex="-1">
+                            <i class="fas fa-eye-slash"></i>
+                        </button>
+                    </div>
+                </div>
+                <p class="auth-error" id="loginError"></p>
+                <button id="loginBtn" class="auth-submit-btn">
+                    <i class="fas fa-sign-in-alt"></i>
+                    ログイン
+                </button>
+            </div>
+
+            <!-- 登録フォーム -->
+            <div id="registerForm" class="auth-form" style="display:none">
+                <div class="form-group">
+                    <label><i class="fas fa-user"></i> 名前</label>
+                    <input type="text" id="registerName" placeholder="表示名（20文字以内）" maxlength="20" autocomplete="username">
+                    <span class="form-hint">例: 田中太郎（自由な名前）</span>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-lock"></i> パスワード</label>
+                    <div class="password-wrap">
+                        <input type="password" id="registerPassword" placeholder="半角英数字4文字以上" autocomplete="new-password">
+                        <button class="pw-toggle-btn" data-target="registerPassword" tabindex="-1">
+                            <i class="fas fa-eye-slash"></i>
+                        </button>
+                    </div>
+                    <span class="form-hint">半角英数字のみ・4文字以上</span>
+                </div>
+                <p class="auth-error" id="registerError"></p>
+                <button id="registerBtn" class="auth-submit-btn">
+                    <i class="fas fa-user-plus"></i>
+                    アカウントを作成
+                </button>
+            </div>
+
+            <div class="auth-footer-note">
+                <i class="fas fa-lock"></i>
+                AES-GCM 256bit暗号化 &nbsp;|&nbsp; WebRTC P2P通信
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== メイン画面（ユーザーリスト＋通話） ========== -->
+<div id="mainScreen" class="screen" style="display:none">
+    <div class="app-container">
+
+        <!-- ヘッダー -->
+        <header class="app-header">
+            <div class="logo">
+                <i class="fas fa-video"></i>
+                <h1>Secure Video Chat</h1>
+            </div>
+
+            <div class="header-center">
+                <div class="connection-status">
+                    <span class="status-indicator" id="statusIndicator"></span>
+                    <span id="connectionStatus">準備中...</span>
+                </div>
+            </div>
+
+            <div class="header-right">
+                <!-- セキュリティ情報トグルボタン -->
+                <button id="securityToggleBtn" class="icon-button" title="セキュリティ情報">
+                    <i class="fas fa-shield-alt"></i>
+                </button>
+                <!-- ログアウト -->
+                <div class="user-menu">
+                    <span id="headerUserName" class="header-username"></span>
+                    <button id="logoutBtn" class="icon-button" title="ログアウト">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- セキュリティ情報パネル -->
+        <div id="securityPanel" class="security-panel collapsed">
+            <div class="security-panel-inner">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>あなたのピアID</label>
+                        <div class="copy-field">
+                            <input type="text" id="localPeerId" readonly>
+                            <button class="copy-btn" data-target="localPeerId" title="IDをコピー">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <label>暗号化キー</label>
+                        <div class="copy-field key-field">
+                            <input type="password" id="encryptionKey" readonly>
+                            <button class="toggle-visibility-btn">
+                                <i class="fas fa-eye-slash"></i>
+                            </button>
+                            <button class="copy-btn" data-target="encryptionKey" title="キーをコピー">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <main class="main-content" role="main">
+            <div class="main-layout">
+
+                <!-- 左：オンラインユーザーリスト -->
+                <aside class="users-panel">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-users"></i> オンライン</h2>
+                        <button id="refreshListBtn" class="icon-button" title="リスト更新">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                    <div id="userList" class="user-list">
+                        <div class="user-list-empty">
+                            <i class="fas fa-user-slash"></i>
+                            <p>オンラインのユーザーがいません</p>
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- 右：ビデオエリア -->
+                <section class="video-area">
+                    <!-- 待機中の表示 -->
+                    <div id="waitingState" class="waiting-state">
+                        <div class="waiting-icon">
+                            <i class="fas fa-phone"></i>
+                        </div>
+                        <p class="waiting-title">通話待機中</p>
+                        <p class="waiting-desc">左のリストからユーザーを選んで通話を開始してください</p>
+                    </div>
+
+                    <!-- ビデオグリッド -->
+                    <div id="videoGrid" class="video-grid" style="display:none">
+                        <div class="video-container local">
+                            <video id="localVideo" autoplay muted playsinline></video>
+                            <div class="video-overlay">
+                                <span class="participant-name" id="localName">あなた</span>
+                                <div class="video-controls">
+                                    <button id="toggleMicButton" class="control-button" title="マイク切替">
+                                        <i class="fas fa-microphone"></i>
+                                    </button>
+                                    <button id="toggleVideoButton" class="control-button" title="カメラ切替">
+                                        <i class="fas fa-video"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="video-container remote">
+                            <video id="remoteVideo" autoplay playsinline></video>
+                            <div class="video-overlay">
+                                <span class="participant-name" id="remoteName">相手</span>
+                                <div class="video-controls">
+                                    <div class="connection-quality">
+                                        <span id="connectionQuality">待機中...</span>
+                                    </div>
+                                    <button id="volumeControlButton" class="control-button" title="音量">
+                                        <i class="fas fa-volume-up"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="volume-slider-container">
+                                <div class="volume-label">
+                                    <span>音量 <span id="volumeValue">100</span>%</span>
+                                    <span class="boost-badge" id="boostBadge">BOOST</span>
+                                </div>
+                                <input type="range" id="volumeSlider" class="volume-slider" min="0" max="300" value="100" step="2">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 通話中の切断ボタン -->
+                    <div id="callControls" class="call-controls" style="display:none">
+                        <button id="disconnectButton" class="end-call-btn">
+                            <i class="fas fa-phone-slash"></i>
+                            通話を終了
+                        </button>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <footer class="app-footer">
+            <div class="encryption-status">
+                <i class="fas fa-lock"></i>
+                エンドツーエンド暗号化通信
+                <span class="separator">|</span>
+                AES-GCM 256bit暗号化
+                <span class="separator">|</span>
+                WebRTC P2P通信
+            </div>
+            <div class="shortcut-setting">
+                <label class="shortcut-label">
+                    <i class="fas fa-bolt"></i>
+                    Shift×3 ジャンプ先
+                </label>
+                <div class="shortcut-input-wrap">
+                    <input type="url" id="shiftShortcutUrl" placeholder="https://example.com" spellcheck="false">
+                    <button id="saveShortcutBtn" class="shortcut-save-btn" title="保存">
+                        <i class="fas fa-check"></i>
+                    </button>
+                </div>
+                <span class="shortcut-saved-msg" id="shortcutSavedMsg">保存しました</span>
+            </div>
+        </footer>
+    </div>
+</div>
+
+<!-- ========== 権限説明モーダル ========== -->
+<div id="permissionModal" class="modal">
+    <div class="modal-content permission-modal-content">
+        <div class="permission-icon-wrap">
+            <i class="fas fa-shield-alt permission-icon"></i>
+        </div>
+        <h2 class="permission-title">はじめに権限の許可が必要です</h2>
+        <p class="permission-desc">このアプリを使用するには、以下の権限を許可してください。<br>許可しないと正常に動作しません。</p>
+
+        <ul class="permission-list">
+            <li>
+                <i class="fas fa-video"></i>
+                <div>
+                    <strong>カメラ・マイク</strong>
+                    <span>映像・音声通話に使用します。ブラウザのダイアログで「許可」を選んでください。</span>
+                </div>
+            </li>
+            <li>
+                <i class="fas fa-window-restore"></i>
+                <div>
+                    <strong>ポップアップ</strong>
+                    <span>Shift×3ショートカットで別ページを開くために必要です。</span>
+                </div>
+            </li>
+        </ul>
+
+        <div class="permission-popup-guide">
+            <div class="popup-guide-title">
+                <i class="fas fa-exclamation-triangle"></i>
+                ポップアップがブロックされた場合の許可手順
+            </div>
+            <ol class="popup-guide-steps">
+                <li>アドレスバー右端に表示される <strong>ブロックアイコン（🚫または⊘）</strong> をクリック</li>
+                <li>「<strong>ポップアップとリダイレクトを常に許可する</strong>」を選択</li>
+                <li>「<strong>完了</strong>」をクリックしてページをリロード</li>
+            </ol>
+            <p class="popup-guide-note">※ Chromeの場合：アドレスバー右の <i class="fas fa-ban" style="color:#dc2626;font-size:0.8em;"></i> → サイトの設定 → ポップアップとリダイレクト → 許可</p>
+        </div>
+
+        <div class="permission-btn-row">
+            <button id="permissionStartBtn" class="permission-start-btn">
+                <i class="fas fa-check-circle"></i>
+                許可して開始する
+            </button>
+            <button id="permissionCloseBtn" class="permission-close-btn">
+                閉じる
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ========== 通話申請受信モーダル ========== -->
+<div id="incomingCallModal" class="modal">
+    <div class="modal-content incoming-call-content">
+        <div class="incoming-call-icon">
+            <i class="fas fa-phone-volume"></i>
+        </div>
+        <h2 class="incoming-call-title">着信</h2>
+        <p class="incoming-call-from"><span id="incomingCallerName"></span> から通話申請が届いています</p>
+        <div class="incoming-call-actions">
+            <button id="acceptCallBtn" class="accept-btn">
+                <i class="fas fa-phone"></i>
+                応答する
+            </button>
+            <button id="rejectCallBtn" class="reject-btn">
+                <i class="fas fa-phone-slash"></i>
+                拒否する
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ========== 通知モーダル ========== -->
+<div id="notificationModal" class="modal">
+    <div class="modal-content">
+        <i class="modal-icon"></i>
+        <p class="modal-message"></p>
+        <button class="modal-close">OK</button>
+    </div>
+</div>
+
+<!-- ========== 通話申請中モーダル ========== -->
+<div id="callingModal" class="modal">
+    <div class="modal-content calling-content">
+        <div class="calling-animation">
+            <div class="calling-ring"></div>
+            <div class="calling-ring"></div>
+            <div class="calling-icon-wrap">
+                <i class="fas fa-phone"></i>
+            </div>
+        </div>
+        <p class="calling-to">呼び出し中...</p>
+        <p class="calling-name" id="callingTargetName"></p>
+        <button id="cancelCallBtn" class="cancel-call-btn">
+            <i class="fas fa-phone-slash"></i>
+            キャンセル
+        </button>
+    </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
