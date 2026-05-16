@@ -779,7 +779,7 @@ class SecureVideoChat {
                 break;
 
             case 'call_end':
-                if (!this.isDisconnecting) {
+                if (!this.isDisconnecting && this.currentCall) {
                     this.handleRemoteDisconnect(`${signal.from} が通話を終了しました`);
                 }
                 break;
@@ -925,6 +925,7 @@ class SecureVideoChat {
     // =====================================================
     handleCall(call) {
         this.currentCall = call;
+        this._remoteDisconnectHandled = false; // 新しい通話開始 → フラグをリセット
 
         call.on('stream', stream => {
             this.el.remoteVideo.srcObject = stream;
@@ -995,7 +996,8 @@ class SecureVideoChat {
     async disconnect() {
         if (this.isDisconnecting) return; // 二重実行防止
         this.isDisconnecting = true;
-        this._remoteDisconnectHandled = false; // 次の通話に備えてリセット
+        // _remoteDisconnectHandled はここではリセットしない。
+        // 次の通話開始時（handleCall）にリセットする。
 
         // 接続品質モニタリングを停止
         if (this._qualityInterval) {
