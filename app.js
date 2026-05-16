@@ -715,7 +715,6 @@ class SecureVideoChat {
     startPolling() {
         this.stopPolling();
         this._signalPollCount = 0;
-        this._processedSignalIds = new Set(); // 処理済みシグナルIDを追跡
         this.pollingInterval = setInterval(() => this.pollSignals(), 2000);
     }
 
@@ -733,13 +732,8 @@ class SecureVideoChat {
             if (!res.ok) return;
 
             for (const signal of res.signals) {
-                // 処理済みシグナルはスキップ（ackが完了する前に再受信した場合の重複防止）
-                if (this._processedSignalIds && this._processedSignalIds.has(signal.id)) continue;
-                if (this._processedSignalIds) this._processedSignalIds.add(signal.id);
                 await this.handleSignal(signal);
                 await GasAPI.ackSignal(this.token, signal.id);
-                // ack完了後はSetから削除してメモリ節約
-                if (this._processedSignalIds) this._processedSignalIds.delete(signal.id);
             }
 
             // オンラインリストは5回に1回（約10秒ごと）更新
@@ -1084,6 +1078,9 @@ class SecureVideoChat {
     showUserListSection(visible) {
         const section = document.querySelector('.user-list-section') || this.el.userList?.closest('section') || this.el.userList?.parentElement;
         if (section) section.style.display = visible ? '' : 'none';
+        // 通話中はmain-layoutにin-callクラスを付与してビデオが全幅を占有できるようにする
+        const mainLayout = document.querySelector('.main-layout');
+        if (mainLayout) mainLayout.classList.toggle('in-call', !visible);
     }
 
     async cleanup() {
