@@ -348,16 +348,14 @@ button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important;
    ===================================================== */
 .main-content {
     flex: 1;
-    display: flex;
+    min-height: 0;         /* app-containerのflex子として縮小可能にする */
     overflow: hidden;
-    min-height: 0;
 }
 
 .main-layout {
     display: grid;
     grid-template-columns: 280px 1fr;
-    width: 100%;
-    min-height: 0;
+    height: 100%;          /* main-contentの高さを100%使う */
     overflow: hidden;
 }
 
@@ -485,15 +483,16 @@ button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important;
 /* =====================================================
    ビデオエリア
    ===================================================== */
+
+/* video-areaはmain-layout内のgridアイテム。
+   height:100%で親gridセルを満たし、flex列で内側を整理する */
 .video-area {
     display: flex;
     flex-direction: column;
     padding: 1rem;
     gap: 1rem;
     overflow: hidden;
-    flex: 1;
-    min-height: 0;
-    min-width: 0;
+    /* heightは親gridセルから決まるため指定不要 */
 }
 
 .waiting-state {
@@ -504,7 +503,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important;
     justify-content: center;
     text-align: center;
     color: var(--text-secondary);
-    min-height: 300px;
 }
 
 .waiting-icon {
@@ -533,26 +531,26 @@ button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important;
     max-width: 300px;
 }
 
-/* ビデオグリッド
-   PC: 横並び2カラム、エリアの高さを最大限使う
-   -------------------------------------------- */
+/* ===== ビデオグリッド（PC: 横2列） =====
+   video-areaのflex-growで残り高さを取得。
+   その高さをgridがそのまま使い、各セルが均等に半分ずつ持つ。 */
 .video-grid {
+    flex: 1;               /* video-area内の残り高さをすべて使う */
+    min-height: 0;         /* flexアイテムが縮小できるようにする（必須） */
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr;  /* 親の高さを均等に分割 */
+    grid-template-columns: 1fr 1fr;   /* PC: 横2列 */
+    grid-template-rows: 1fr;          /* 行は1つ: 全高を使う */
     gap: 1rem;
-    flex: 1;                  /* video-area内の余白をすべて使う */
-    min-height: 0;            /* flexアイテムの縮小を許可 */
 }
 
+/* video-containerはgridセルを100%埋める */
 .video-container {
     position: relative;
     background-color: #1a1a1a;
     border-radius: var(--border-radius-lg);
     overflow: hidden;
     box-shadow: var(--shadow-lg);
-    min-height: 0;
-    /* aspect-ratioではなく親グリッドの高さに従う */
+    /* widthもheightもgridセルから自動決定 → 指定不要 */
 }
 
 .video-container video {
@@ -1035,18 +1033,20 @@ button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important;
     }
 
     .video-grid {
+        /* モバイル: 縦1列。高さはaspect-ratioで決まるのでflexを解除 */
         grid-template-columns: 1fr;
-        grid-template-rows: auto auto; /* モバイルはauto: aspect-ratioで高さ決定 */
+        grid-template-rows: auto auto;
+        flex: none;
         gap: 0.75rem;
-        flex: none;           /* モバイルではflexを解除してスクロール可能に */
     }
     .video-container {
-        aspect-ratio: 16 / 9; /* モバイルは幅基準でaspectratio */
-        min-height: 0;
+        /* 幅が確定しているのでaspect-ratioが正しく機能する */
+        aspect-ratio: 16 / 9;
+        height: auto;
     }
     .video-area {
         padding: 0.75rem;
-        overflow: auto;       /* モバイルはスクロール許可 */
+        overflow-y: auto;  /* 縦並びなのでスクロール可 */
     }
 
     .app-footer { flex-direction: column; align-items: stretch; gap: 0.5rem; padding: 0.6rem 1rem; }
