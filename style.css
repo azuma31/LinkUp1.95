@@ -490,7 +490,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important;
     flex-direction: column;
     padding: 1rem;
     gap: 1rem;
-    overflow: auto;
+    overflow: hidden;
     flex: 1;
     min-height: 0;
     min-width: 0;
@@ -533,14 +533,16 @@ button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important;
     max-width: 300px;
 }
 
-/* ビデオグリッド */
+/* ビデオグリッド
+   PC: 横並び2カラム、エリアの高さを最大限使う
+   -------------------------------------------- */
 .video-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;  /* 親の高さを均等に分割 */
     gap: 1rem;
-    flex: 1;
-    min-height: 0;
-    align-content: start;
+    flex: 1;                  /* video-area内の余白をすべて使う */
+    min-height: 0;            /* flexアイテムの縮小を許可 */
 }
 
 .video-container {
@@ -550,11 +552,15 @@ button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important;
     overflow: hidden;
     box-shadow: var(--shadow-lg);
     min-height: 0;
-    aspect-ratio: 16 / 9;
-    width: 100%;
+    /* aspect-ratioではなく親グリッドの高さに従う */
 }
 
-.video-container video { width: 100%; height: 100%; object-fit: cover; }
+.video-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
 
 .video-overlay {
     position: absolute;
@@ -599,6 +605,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important;
 .call-controls {
     display: flex;
     justify-content: center;
+    flex-shrink: 0;
 }
 
 .end-call-btn {
@@ -1029,11 +1036,18 @@ button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important;
 
     .video-grid {
         grid-template-columns: 1fr;
+        grid-template-rows: auto auto; /* モバイルはauto: aspect-ratioで高さ決定 */
         gap: 0.75rem;
-        align-content: start;
+        flex: none;           /* モバイルではflexを解除してスクロール可能に */
     }
-    .video-container { min-height: 0; aspect-ratio: 16 / 9; width: 100%; }
-    .video-area { padding: 0.75rem; }
+    .video-container {
+        aspect-ratio: 16 / 9; /* モバイルは幅基準でaspectratio */
+        min-height: 0;
+    }
+    .video-area {
+        padding: 0.75rem;
+        overflow: auto;       /* モバイルはスクロール許可 */
+    }
 
     .app-footer { flex-direction: column; align-items: stretch; gap: 0.5rem; padding: 0.6rem 1rem; }
     .shortcut-setting { max-width: none; }

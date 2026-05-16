@@ -884,11 +884,11 @@ class SecureVideoChat {
         this._incomingCallHandled = true;
         clearTimeout(this._incomingTimeout);
         this.el.incomingCallModal.classList.remove('visible');
-        // ボタンを無効化して連打防止
-        this.el.acceptCallBtn.disabled = true;
-        this.el.rejectCallBtn.disabled = true;
 
-        if (!this.pendingSignal) return;
+        if (!this.pendingSignal) {
+            this._incomingCallHandled = false;
+            return;
+        }
         const signal = this.pendingSignal;
         this.pendingSignal = null;
 
@@ -897,21 +897,20 @@ class SecureVideoChat {
 
         this.callTargetName = signal.from;
         this.el.remoteName.textContent = signal.from;
-        // UI表示はpeer.on('call')のanswerタイミングで行う（発信者がcallを送ってくるまで待つ）
 
         // 自分のピアIDを相手に返す（承認シグナル）
         try {
             await GasAPI.sendSignal(this.token, signal.from, 'call_accept', this.peer.id);
         } catch (e) {
             this.showNotification('エラー', '応答シグナルの送信に失敗しました', 'error');
+            this._incomingCallHandled = false;
             return;
         }
 
         // 着信側はpeer.on('call')で自動的にanswerされるため、ここでは何もしない
         // （発信者がcall_acceptを受け取った後にWebRTC接続を開始する）
         console.log('[着信承認完了] 発信者からのWebRTC着信を待機中...');
-        // ボタンは通話終了後（disconnect）でリセットされるが念のため
-        this._incomingCallHandled = false;
+        // フラグは disconnect() 完了後にリセットされる
     }
 
     async rejectIncomingCall() {
@@ -919,10 +918,11 @@ class SecureVideoChat {
         this._incomingCallHandled = true;
         clearTimeout(this._incomingTimeout);
         this.el.incomingCallModal.classList.remove('visible');
-        this.el.acceptCallBtn.disabled = true;
-        this.el.rejectCallBtn.disabled = true;
 
-        if (!this.pendingSignal) return;
+        if (!this.pendingSignal) {
+            this._incomingCallHandled = false;
+            return;
+        }
         const signal = this.pendingSignal;
         this.pendingSignal = null;
 
@@ -931,13 +931,11 @@ class SecureVideoChat {
         } catch (_) { }
 
         // 次の着信に備えてリセット
-        this._resetIncomingCallButtons();
+        this._incomingCallHandled = false;
     }
 
     _resetIncomingCallButtons() {
         this._incomingCallHandled = false;
-        this.el.acceptCallBtn.disabled = false;
-        this.el.rejectCallBtn.disabled = false;
     }
 
     // =====================================================
@@ -1059,7 +1057,10 @@ class SecureVideoChat {
 
         // _remoteDisconnectHandledは遅れて来るcloseイベントをブロックするため
         // 少し遅らせてからリセット（次の通話に備える）
-        setTimeout(() => { this._remoteDisconnectHandled = false; }, 1000);
+        setTimeout(() => {
+            this._remoteDisconnectHandled = false;
+            this._incomingCallHandled = false; // 次の着信に備えてリセット
+        }, 1000);
 
         // PeerJSを再初期化してオンライン状態に戻る
         try {
