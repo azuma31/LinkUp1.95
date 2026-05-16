@@ -460,10 +460,9 @@ class SecureVideoChat {
         // 通話制御
         this.el.disconnectButton.addEventListener('click', () => {
             if (this.isDisconnecting) return;
+            this.el.disconnectButton.disabled = true;
+            this.el.disconnectButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 切断中...';
             this.disconnectedBySelf = true;
-            // isDisconnecting はここでは立てない。disconnect()内で立てる。
-            // sendDisconnectSignal中に相手イベントが来てもhandleRemoteDisconnect側でisDisconnectingを見るため、
-            // sendDisconnectSignal完了後にdisconnect()を呼ぶことで二重実行を防ぐ。
             this.sendDisconnectSignal().then(() => {
                 this.showDisconnectOverlay('通話を終了しました');
                 this.disconnect();
@@ -868,6 +867,7 @@ class SecureVideoChat {
     // =====================================================
     showIncomingCall(signal) {
         this.pendingSignal = signal;
+        this._resetIncomingCallButtons(); // 前回の状態をリセット
         this.el.incomingCallerName.textContent = signal.from;
         this.el.incomingCallModal.classList.add('visible');
 
@@ -880,8 +880,13 @@ class SecureVideoChat {
     }
 
     async acceptIncomingCall() {
+        if (this._incomingCallHandled) return; // 二重タップ防止
+        this._incomingCallHandled = true;
         clearTimeout(this._incomingTimeout);
         this.el.incomingCallModal.classList.remove('visible');
+        // ボタンを無効化して連打防止
+        this.el.acceptCallBtn.disabled = true;
+        this.el.rejectCallBtn.disabled = true;
 
         if (!this.pendingSignal) return;
         const signal = this.pendingSignal;
@@ -905,11 +910,17 @@ class SecureVideoChat {
         // 着信側はpeer.on('call')で自動的にanswerされるため、ここでは何もしない
         // （発信者がcall_acceptを受け取った後にWebRTC接続を開始する）
         console.log('[着信承認完了] 発信者からのWebRTC着信を待機中...');
+        // ボタンは通話終了後（disconnect）でリセットされるが念のため
+        this._incomingCallHandled = false;
     }
 
     async rejectIncomingCall() {
+        if (this._incomingCallHandled) return; // 二重タップ防止
+        this._incomingCallHandled = true;
         clearTimeout(this._incomingTimeout);
         this.el.incomingCallModal.classList.remove('visible');
+        this.el.acceptCallBtn.disabled = true;
+        this.el.rejectCallBtn.disabled = true;
 
         if (!this.pendingSignal) return;
         const signal = this.pendingSignal;
@@ -918,6 +929,15 @@ class SecureVideoChat {
         try {
             await GasAPI.sendSignal(this.token, signal.from, 'call_reject', '拒否');
         } catch (_) { }
+
+        // 次の着信に備えてリセット
+        this._resetIncomingCallButtons();
+    }
+
+    _resetIncomingCallButtons() {
+        this._incomingCallHandled = false;
+        this.el.acceptCallBtn.disabled = false;
+        this.el.rejectCallBtn.disabled = false;
     }
 
     // =====================================================
@@ -974,6 +994,8 @@ class SecureVideoChat {
         if (this.isDisconnecting) return; // すでに処理中なら無視
         if (this._remoteDisconnectHandled) return; // 複数イベント源からの重複発火を防止
         this._remoteDisconnectHandled = true;
+        // 通話中でない場合（既に切断済み）も無視
+        if (!this.currentCall && !this.dataConnection) return;
         this.showDisconnectOverlay(reason);
         this.disconnect();
     }
@@ -1027,8 +1049,17 @@ class SecureVideoChat {
 
         this.disconnectedBySelf = false;
         this.isDisconnecting = false;
-        this._remoteDisconnectHandled = false; // 次の通話に備えてリセット（全クリーンアップ完了後）
         this.callTargetName = null;
+
+        // 通話終了ボタンを元の状態に戻す
+        if (this.el.disconnectButton) {
+            this.el.disconnectButton.disabled = false;
+            this.el.disconnectButton.innerHTML = '<i class="fas fa-phone-slash"></i> 通話を終了';
+        }
+
+        // _remoteDisconnectHandledは遅れて来るcloseイベントをブロックするため
+        // 少し遅らせてからリセット（次の通話に備える）
+        setTimeout(() => { this._remoteDisconnectHandled = false; }, 1000);
 
         // PeerJSを再初期化してオンライン状態に戻る
         try {
