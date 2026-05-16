@@ -3,7 +3,7 @@
 // =====================================================
 
 // ★★★ ここにGASのウェブアプリURLを設定してください ★★★
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzLAnY6m5lHYqw1U6d_UPsxuBEsif_M-zjpjanzHlX2QO6w34fyFhM5csi21rKwCypa/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzTssqitUmWhsAg-sfaFaIknvH0tywO6NKLWjYfPTXnVHTfbR7p4qcqdAYH0Fu9Fm6o/exec';
 
 // =====================================================
 // 暗号化ユーティリティ
@@ -461,7 +461,9 @@ class SecureVideoChat {
         this.el.disconnectButton.addEventListener('click', () => {
             if (this.isDisconnecting) return;
             this.disconnectedBySelf = true;
-            this.isDisconnecting = true; // 自分から切断 → 相手切断イベントを無視
+            // isDisconnecting はここでは立てない。disconnect()内で立てる。
+            // sendDisconnectSignal中に相手イベントが来てもhandleRemoteDisconnect側でisDisconnectingを見るため、
+            // sendDisconnectSignal完了後にdisconnect()を呼ぶことで二重実行を防ぐ。
             this.sendDisconnectSignal().then(() => {
                 this.showDisconnectOverlay('通話を終了しました');
                 this.disconnect();
@@ -968,6 +970,8 @@ class SecureVideoChat {
     // 相手側の切断を一元処理（二重発火防止付き）
     handleRemoteDisconnect(reason) {
         if (this.isDisconnecting) return; // すでに処理中なら無視
+        if (this._remoteDisconnectHandled) return; // 複数イベント源からの重複発火を防止
+        this._remoteDisconnectHandled = true;
         this.showDisconnectOverlay(reason);
         this.disconnect();
     }
@@ -991,6 +995,7 @@ class SecureVideoChat {
     async disconnect() {
         if (this.isDisconnecting) return; // 二重実行防止
         this.isDisconnecting = true;
+        this._remoteDisconnectHandled = false; // 次の通話に備えてリセット
 
         // 接続品質モニタリングを停止
         if (this._qualityInterval) {
