@@ -936,9 +936,7 @@ class SecureVideoChat {
         call.on('close', () => {
             // isDisconnecting中（自分側のcleanupが原因のclose）は無視
             if (this.isDisconnecting) return;
-            // call_end シグナルや dataConnection.close と重複するため
-            // 少し遅らせて、すでに処理済みなら無視
-            setTimeout(() => this.handleRemoteDisconnect('相手が通話を終了しました'), 300);
+            this.handleRemoteDisconnect('相手が通話を終了しました');
         });
 
         call.peerConnection.oniceconnectionstatechange = () => {
@@ -953,8 +951,9 @@ class SecureVideoChat {
 
         this.dataConnection.on('data', async data => {
             if (data && data.type === 'DISCONNECT_SIGNAL') {
-                // データチャネル経由の切断シグナルを最優先で処理
-                this.handleRemoteDisconnect('相手が通話を終了しました');
+                if (!this.isDisconnecting) {
+                    this.handleRemoteDisconnect('相手が通話を終了しました');
+                }
                 return;
             }
             try {
@@ -966,8 +965,7 @@ class SecureVideoChat {
         this.dataConnection.on('close', () => {
             // isDisconnecting中（自分側のcleanupが原因のclose）は無視
             if (this.isDisconnecting) return;
-            // call.on('close') と重複するため少し遅らせる
-            setTimeout(() => this.handleRemoteDisconnect('相手が通話を終了しました'), 300);
+            this.handleRemoteDisconnect('相手が通話を終了しました');
         });
     }
 
@@ -999,7 +997,8 @@ class SecureVideoChat {
     async disconnect() {
         if (this.isDisconnecting) return; // 二重実行防止
         this.isDisconnecting = true;
-        // _remoteDisconnectHandled は cleanup完了後にリセット（早期リセット禁止）
+        // _remoteDisconnectHandled は disconnect() 中はそのまま保持し、
+        // 次の通話開始（initiateWebRTCCall / peer.on('call')）までリセットしない
 
         // 接続品質モニタリングを停止
         if (this._qualityInterval) {
@@ -1028,7 +1027,7 @@ class SecureVideoChat {
 
         this.disconnectedBySelf = false;
         this.isDisconnecting = false;
-        this._remoteDisconnectHandled = false; // 次の通話に備えてリセット（全cleanup完了後）
+        this._remoteDisconnectHandled = false; // 次の通話に備えてリセット（全クリーンアップ完了後）
         this.callTargetName = null;
 
         // PeerJSを再初期化してオンライン状態に戻る
@@ -1197,7 +1196,7 @@ class SecureVideoChat {
 
     showDisconnectOverlay(reason = '通話が終了しました') {
         const existing = document.getElementById('disconnectOverlay');
-        if (existing) existing.remove();
+        if (existing) return; // すでに表示中なら追加しない
         const overlay = document.createElement('div');
         overlay.id = 'disconnectOverlay';
         overlay.className = 'disconnect-overlay';

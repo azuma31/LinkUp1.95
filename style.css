@@ -355,7 +355,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important;
 
 .main-layout {
     display: grid;
-    grid-template-columns: 240px 1fr;
+    grid-template-columns: 280px 1fr;
     width: 100%;
     min-height: 0;
     overflow: hidden;
@@ -535,7 +535,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important;
 /* ビデオグリッド */
 .video-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(560px, 100%), 1fr));
+    grid-template-columns: 1fr 1fr;
     gap: 1rem;
     flex: 1;
     min-height: 0;
@@ -548,7 +548,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important;
     border-radius: var(--border-radius-lg);
     overflow: hidden;
     box-shadow: var(--shadow-lg);
-    min-height: 260px;
+    min-height: 0;
     aspect-ratio: 16 / 9;
 }
 
@@ -1026,7 +1026,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important;
     }
 
     .video-grid { grid-template-columns: 1fr; }
-    .video-container { min-height: 200px; aspect-ratio: 16 / 9; }
+    .video-container { min-height: 0; aspect-ratio: 16 / 9; }
     .video-area { padding: 0.75rem; }
 
     .app-footer { flex-direction: column; align-items: stretch; gap: 0.5rem; padding: 0.6rem 1rem; }
