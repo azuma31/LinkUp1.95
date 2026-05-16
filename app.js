@@ -779,7 +779,7 @@ class SecureVideoChat {
                 break;
 
             case 'call_end':
-                if (!this.isDisconnecting && this.currentCall) {
+                if (!this.isDisconnecting) {
                     this.handleRemoteDisconnect(`${signal.from} が通話を終了しました`);
                 }
                 break;
@@ -925,7 +925,6 @@ class SecureVideoChat {
     // =====================================================
     handleCall(call) {
         this.currentCall = call;
-        this._remoteDisconnectHandled = false; // 新しい通話開始 → フラグをリセット
 
         call.on('stream', stream => {
             this.el.remoteVideo.srcObject = stream;
@@ -937,7 +936,9 @@ class SecureVideoChat {
         call.on('close', () => {
             // isDisconnecting中（自分側のcleanupが原因のclose）は無視
             if (this.isDisconnecting) return;
-            this.handleRemoteDisconnect('相手が通話を終了しました');
+            // call_end シグナルや dataConnection.close と重複するため
+            // 少し遅らせて、すでに処理済みなら無視
+            setTimeout(() => this.handleRemoteDisconnect('相手が通話を終了しました'), 300);
         });
 
         call.peerConnection.oniceconnectionstatechange = () => {
@@ -952,6 +953,7 @@ class SecureVideoChat {
 
         this.dataConnection.on('data', async data => {
             if (data && data.type === 'DISCONNECT_SIGNAL') {
+                // データチャネル経由の切断シグナルを最優先で処理
                 this.handleRemoteDisconnect('相手が通話を終了しました');
                 return;
             }
@@ -964,7 +966,8 @@ class SecureVideoChat {
         this.dataConnection.on('close', () => {
             // isDisconnecting中（自分側のcleanupが原因のclose）は無視
             if (this.isDisconnecting) return;
-            this.handleRemoteDisconnect('相手が通話を終了しました');
+            // call.on('close') と重複するため少し遅らせる
+            setTimeout(() => this.handleRemoteDisconnect('相手が通話を終了しました'), 300);
         });
     }
 
@@ -996,8 +999,7 @@ class SecureVideoChat {
     async disconnect() {
         if (this.isDisconnecting) return; // 二重実行防止
         this.isDisconnecting = true;
-        // _remoteDisconnectHandled はここではリセットしない。
-        // 次の通話開始時（handleCall）にリセットする。
+        // _remoteDisconnectHandled は cleanup完了後にリセット（早期リセット禁止）
 
         // 接続品質モニタリングを停止
         if (this._qualityInterval) {
@@ -1026,6 +1028,7 @@ class SecureVideoChat {
 
         this.disconnectedBySelf = false;
         this.isDisconnecting = false;
+        this._remoteDisconnectHandled = false; // 次の通話に備えてリセット（全cleanup完了後）
         this.callTargetName = null;
 
         // PeerJSを再初期化してオンライン状態に戻る
